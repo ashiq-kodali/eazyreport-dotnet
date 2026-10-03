@@ -1,0 +1,46 @@
+name: Publish to NuGet
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  publish:
+    name: Build, Test and Publish to NuGet
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Restore Dependencies
+        run: dotnet restore
+
+      - name: Run Unit Tests
+        run: dotnet test --configuration Release --no-restore
+
+      - name: Build & Pack Package
+        run: dotnet pack src/EazyReport/EazyReport.csproj --configuration Release --no-restore --output ./bin/package
+
+      - name: NuGet Login (OIDC Trusted Publishing)
+        uses: NuGet/login@v1
+        id: login
+        with:
+          user: ashiq-kodali
+
+      - name: Push to NuGet.org
+        run: |
+          dotnet nuget push ./bin/package/*.nupkg \
+            --api-key "${{ steps.login.outputs.NUGET_API_KEY }}" \
+            --source https://api.nuget.org/v3/index.json \
+            --skip-duplicate
